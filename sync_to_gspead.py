@@ -24,7 +24,7 @@ def main():
 
         connection.close()
     except sqlite3.Error as e:
-        log_run_metrics(cursor, start_time, datetime.now(), datetime.now() - start_time, 'gspreadsync', 'SUCCESS', e)
+        log_run_metrics(cursor, start_time, datetime.now(), datetime.now() - start_time, 'gspreadsync', 'FAILED', e)
 
 
 def log_run_metrics(connection, start_time, end_time, duration, operation, status, error):
