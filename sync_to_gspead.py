@@ -4,31 +4,37 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import sqlite3
 import hashlib
-from sqlite3 import Error
 from datetime import datetime
 import platform
 
 
 def main():
     start_time = datetime.now()
-    db = create_connection()
-    connection = db[1]
-    cursor = db[0]
+    try:
+        db = create_connection()
+        connection = db[1]
+        cursor = db[0]
 
-    data = query(cursor)
-
-    connection.close()
-    sync_to_google(data)
-
-    end_time = datetime.now()
-
-    print(start_time, end_time)
-    print(end_time - start_time)
+        data = query(cursor)
 
 
-def log_run_metrics(start_time, end_time, operation, status, exception):
-    pass
+        sync_to_google(data)
 
+        log_run_metrics(connection, start_time, datetime.now(), datetime.now() - start_time, 'gspreadsync', 'SUCCESS', '')
+
+        connection.close()
+    except sqlite3.Error as e:
+        log_run_metrics(cursor, start_time, datetime.now(), datetime.now() - start_time, 'gspreadsync', 'SUCCESS', e)
+
+
+def log_run_metrics(connection, start_time, end_time, duration, operation, status, error):
+
+    package = [str(start_time), str(end_time), str(duration), str(operation), str(status), str(error)]
+
+    connection.cursor().execute("""
+        INSERT INTO SystemLog(StartTime, EndTime, Duration, Operation, Status, ErrorMessage) 
+        VALUES (?,?,?,?,?,?)""", package)
+    connection.commit()
 
 def create_connection():
     # determine platform that's running
@@ -42,12 +48,12 @@ def create_connection():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor(), conn
         return cursor
-    except Error as e:
+    except sqlite3.Error as e:
         return
 
 
-def query(connection):
-    connection.execute('''
+def query(cursor):
+    cursor.execute('''
         SELECT 
             Timestamp, 
             Humidity, 
@@ -60,7 +66,7 @@ def query(connection):
         WHERE 
             MD5Checksum IS NOT NULL
         ''')
-    data = connection.fetchall()
+    data = cursor.fetchall()
 
     return data
 
@@ -111,7 +117,7 @@ def sync_to_google(db_data):
         for i in range(len(transfer_list)):
             cell_list[i].value = transfer_list[i]
 
-        worksheet.update_cells(cell_list)
+        # worksheet.update_cells(cell_list)
 
 
 # cell_list = worksheet.range('A1:C7') OR worksheet.range(1, 1, 7, 2) aka (start row, start column, end row, end column)
